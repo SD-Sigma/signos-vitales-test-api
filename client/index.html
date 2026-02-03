@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Medicion de Signos Vitales</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2f5;
+        }
+
+        #measurement-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #results-container {
+            display: none;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 20px 0;
+            color: #333;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .result-value {
+            color: #2196F3;
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .result-unit {
+            color: #666;
+            font-size: 0.9em;
+            margin-left: 5px;
+        }
+
+        #new-measurement-btn {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin: 30px auto;
+            padding: 15px 30px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #new-measurement-btn:hover {
+            background: #1976D2;
+        }
+
+        #send-email-btn {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin: 10px auto;
+            padding: 15px 30px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #send-email-btn:hover {
+            background: #388E3C;
+        }
+
+        #send-email-btn:disabled {
+            background: #9E9E9E;
+            cursor: not-allowed;
+        }
+
+        .email-status {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .email-status.success {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .email-status.error {
+            background: #FFEBEE;
+            color: #C62828;
+        }
+
+        .snr-info {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        #start-card {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f0f2f5;
+            z-index: 10;
+        }
+
+        #start-card>div {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            max-width: 360px;
+            width: 90%;
+        }
+
+        #start-card h2 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        #start-card p {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        #start-btn {
+            padding: 14px 28px;
+            font-size: 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #start-btn:hover {
+            background: #1976D2;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "@nuralogix.ai/web-measurement-embedded-app": "https://unpkg.com/@nuralogix.ai/web-measurement-embedded-app"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="start-card">
+        <div>
+            <h2>Signos Vitales</h2>
+            <button id="start-btn">Medición Biométrica</button>
+        </div>
+    </div>
+
+    <div id="measurement-container"></div>
+    <div id="results-container">
+        <h1>Resultados de la Medicion</h1>
+        <p class="snr-info" id="snr-display"></p>
+        <div id="results-list"></div>
+        <div id="email-status"></div>
+        <button id="send-email-btn">Enviar por Email</button>
+        <button id="new-measurement-btn" onclick="location.reload()">Nueva Medicion</button>
+    </div>
+
+    <script type="module">
+        import MeasurementEmbeddedApp, { faceAttributeValue } from '@nuralogix.ai/web-measurement-embedded-app';
+
+        // Diccionario de traduccion de metricas
+        const translations = {
+            'Heart Rate': 'Frecuencia Cardiaca',
+            'Pulse Rate': 'Frecuencia de Pulso',
+            'Breathing Rate': 'Frecuencia Respiratoria',
+            'Blood Pressure - Systolic': 'Presion Arterial - Sistolica',
+            'Blood Pressure - Diastolic': 'Presion Arterial - Diastolica',
+            'Systolic Blood Pressure': 'Presion Arterial Sistolica',
+            'Diastolic Blood Pressure': 'Presion Arterial Diastolica',
+            'Pulse Pressure': 'Presion de Pulso',
+            'Mean Arterial Pressure': 'Presion Arterial Media',
+            'Heart Rate Variability': 'Variabilidad de Frecuencia Cardiaca',
+            'Heart Rate Variability - SDNN': 'Variabilidad Cardiaca - SDNN',
+            'Heart Rate Variability - RMSSD': 'Variabilidad Cardiaca - RMSSD',
+            'Heart Rate Variability - pNN50': 'Variabilidad Cardiaca - pNN50',
+            'Heart Rate Variability - LF/HF': 'Variabilidad Cardiaca - LF/HF',
+            'Irregular Heartbeat Count': 'Latidos Irregulares',
+            'Stress Index': 'Indice de Estres',
+            'Mental Stress Index': 'Indice de Estres Mental',
+            'NuraLogix Mental Stress Index': 'Indice de Estres Mental NuraLogix',
+            'Anxiety': 'Ansiedad',
+            'Cardiovascular Disease Risk': 'Riesgo Cardiovascular',
+            'Heart Attack Risk': 'Riesgo de Infarto',
+            'Stroke Risk': 'Riesgo de ACV',
+            'Diabetes Risk': 'Riesgo de Diabetes',
+            'Hypertension Risk': 'Riesgo de Hipertension',
+            'Hemoglobin': 'Hemoglobina',
+            'Hemoglobin A1c': 'Hemoglobina A1c',
+            'Total Cholesterol': 'Colesterol Total',
+            'HDL Cholesterol': 'Colesterol HDL',
+            'LDL Cholesterol': 'Colesterol LDL',
+            'Triglycerides': 'Trigliceridos',
+            'Body Mass Index': 'Indice de Masa Corporal',
+            'Body Shape Index': 'Indice de Forma Corporal',
+            'Waist Circumference': 'Circunferencia de Cintura',
+            'Waist-to-Height Ratio': 'Relacion Cintura-Altura',
+            'Facial Age': 'Edad Facial',
+            'Facial Skin Age': 'Edad de la Piel',
+            'Oxygen Saturation': 'Saturacion de Oxigeno',
+            'Cardiac Workload': 'Carga Cardiaca',
+            'Vascular Capacity': 'Capacidad Vascular',
+            'NuraLogix Vitals Score': 'Puntuacion de Signos Vitales',
+            'NuraLogix Mental Score': 'Puntuacion Mental',
+            'NuraLogix Physical Score': 'Puntuacion Fisica',
+            'NuraLogix Physiological Score': 'Puntuacion Fisiologica',
+            'NuraLogix General Wellness Score': 'Puntuacion de Bienestar General',
+            'NuraLogix Risks Score': 'Puntuacion de Riesgos',
+        };
+
+        // Diccionario de traduccion de unidades
+        const unitTranslations = {
+            'breaths / minute': 'respiraciones / minuto',
+            'beats / minute': 'latidos / minuto',
+            'seconds': 'segundos',
+        };
+
+        function translateMetric(name) {
+            return translations[name] || name;
+        }
+
+        function translateUnit(unit) {
+            return unitTranslations[unit] || unit;
+        }
+
+        const measurementApp = new MeasurementEmbeddedApp();
+        const container = document.getElementById('measurement-container');
+        const resultsContainer = document.getElementById('results-container');
+        const resultsList = document.getElementById('results-list');
+        const snrDisplay = document.getElementById('snr-display');
+        const sendEmailBtn = document.getElementById('send-email-btn');
+        const emailStatus = document.getElementById('email-status');
+
+        // Variable para almacenar los resultados actuales
+        let currentResults = null;
+
+        // Funcion para mostrar resultados en pantalla
+        async function displayResults(results) {
+            container.style.display = 'none';
+            resultsContainer.style.display = 'block';
+
+            const snrValue = results.points.SNR?.value;
+
+            // Detectar SNR -100 como error (medicion fallida)
+            if (snrValue === -100 || snrValue === '-100.00') {
+                try {
+                    await fetch('/api/log-error', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            code: 'MEASUREMENT_FAILED',
+                            message: 'Medicion fallida - SNR: -100.00',
+                            details: 'No se obtuvieron resultados validos'
+                        })
+                    });
+                } catch (e) { /* silenciar error de logging */ }
+            }
+
+            // Guardar resultados para enviar por email
+            currentResults = {
+                snr: snrValue || null,
+                data: {}
+            };
+
+            // Mostrar SNR (calidad de la medicion)
+            if (results.points.SNR) {
+                snrDisplay.textContent = `Calidad de medicion (SNR): ${results.points.SNR.value}`;
+            }
+
+            resultsList.innerHTML = '';
+
+            // Ordenar y mostrar resultados
+            for (const [id, point] of Object.entries(results.points)) {
+                if (point && point.value !== undefined && id !== 'SNR') {
+                    // Guardar para email (con nombres traducidos)
+                    currentResults.data[id] = {
+                        name: translateMetric(point.info.name),
+                        value: point.value,
+                        unit: translateUnit(point.info.unit || '')
+                    };
+
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    card.innerHTML = `
+                        <span class="result-name">${translateMetric(point.info.name)}</span>
+                        <span>
+                            <span class="result-value">${point.value}</span>
+                            <span class="result-unit">${point.info.unit || ''}</span>
+                        </span>
+                    `;
+                    resultsList.appendChild(card);
+                }
+            }
+        }
+
+        // Funcion para enviar resultados por email
+        async function sendResultsByEmail() {
+            if (!currentResults) {
+                emailStatus.className = 'email-status error';
+                emailStatus.textContent = 'No hay resultados para enviar';
+                return;
+            }
+
+            sendEmailBtn.disabled = true;
+            sendEmailBtn.textContent = 'Enviando...';
+            emailStatus.className = 'email-status';
+            emailStatus.textContent = '';
+
+            try {
+                const response = await fetch('/api/send-results', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        results: currentResults.data,
+                        snr: currentResults.snr
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === '200') {
+                    emailStatus.className = 'email-status success';
+                    emailStatus.textContent = 'Email enviado correctamente';
+                    sendEmailBtn.textContent = 'Enviado';
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            } catch (error) {
+                emailStatus.className = 'email-status error';
+                emailStatus.textContent = 'Error: ' + error.message;
+                sendEmailBtn.disabled = false;
+                sendEmailBtn.textContent = 'Reintentar';
+            }
+        }
+
+        // Event listener para el boton de enviar email
+        sendEmailBtn.addEventListener('click', sendResultsByEmail);
+
+        // Inicializar aplicacion
+        async function init() {
+            try {
+                // 1. Obtener credenciales del backend
+                const [studyIdRes, tokenRes] = await Promise.all([
+                    fetch('/api/studyId').then(r => r.json()),
+                    fetch('/api/token').then(r => r.json())
+                ]);
+
+                if (studyIdRes.status !== '200' || tokenRes.status !== '200') {
+                    throw new Error('Error obteniendo credenciales');
+                }
+
+                // 2. Configurar eventos
+                measurementApp.on.results = async (results) => {
+                    console.log('Resultados completos:', results);
+                    displayResults(results);
+                    await measurementApp.destroy();
+                };
+
+                measurementApp.on.error = async (error) => {
+                    console.error('Error:', error);
+
+                    // Enviar error al servidor para logging
+                    try {
+                        await fetch('/api/log-error', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                code: error.code || 'UNKNOWN',
+                                message: error.message || 'Error desconocido',
+                                details: error.details || null
+                            })
+                        });
+                    } catch (e) { /* silenciar error de logging */ }
+
+                    alert('Error en la medicion: ' + (error.message || 'Error desconocido'));
+                };
+
+                measurementApp.on.event = (appEvent) => {
+                    console.log('Evento:', appEvent);
+                };
+
+                // 3. Inicializar widget WMEA
+                await measurementApp.init({
+                    container,
+                    appPath: 'https://unpkg.com/@nuralogix.ai/web-measurement-embedded-app/dist',
+                    language: 'es',
+                    settings: {
+                        token: tokenRes.token,
+                        refreshToken: tokenRes.refreshToken,
+                        studyId: studyIdRes.studyId,
+                    },
+                    config: {
+                        checkConstraints: true,
+                        cameraFacingMode: 'user',
+                        cameraAutoStart: true,
+                        measurementAutoStart: false,
+                        cancelWhenLowSNR: false,
+                    },
+                    profile: {
+                        age: 30,
+                        height: 170,
+                        weight: 70,
+                        sex: faceAttributeValue.SEX_ASSIGNED_MALE_AT_BIRTH,
+                        smoking: faceAttributeValue.SMOKER_FALSE,
+                        bloodPressureMedication: faceAttributeValue.BLOOD_PRESSURE_MEDICATION_FALSE,
+                        diabetes: faceAttributeValue.DIABETES_NONE,
+                    },
+                });
+
+            } catch (error) {
+                console.error('Error de inicializacion:', error);
+
+                // Enviar error al servidor para logging
+                try {
+                    await fetch('/api/log-error', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            code: 'INIT_ERROR',
+                            message: error.message || 'Error de inicializacion',
+                            details: null
+                        })
+                    });
+                } catch (e) { /* silenciar error de logging */ }
+
+                alert('No se pudo inicializar la aplicacion: ' + error.message);
+            }
+        }
+
+        init();
+
+        const startCard = document.getElementById('start-card');
+        const startBtn = document.getElementById('start-btn');
+
+        startBtn.addEventListener('click', async () => {
+
+            startCard.style.display = 'none';
+            container.style.display = 'block';
+
+            // Iniciar cámara + medición
+            await measurementApp.start();
+
+
+        });
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "ejemplo-wmea",
+  "version": "1.0.0",
+  "description": "Ejemplo de integración WMEA via CDN",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env server.mjs"
+  },
+  "dependencies": {
+    "@nuralogix.ai/dfx-api-client": "^1.0.73",
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  }
+}
