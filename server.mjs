@@ -22,12 +22,12 @@ const apiClient = client({
 });
 
 // Endpoint: devuelve Study ID
-app.get('/api/studyId', (req, res) => {
+app.get('/api/studyId2', (req, res) => {
   res.json({ status: '200', studyId: STUDY_ID });
 });
 
 // Endpoint: registra licencia y devuelve tokens
-app.get('/api/token', async (req, res) => {
+app.get('/api/token2', async (req, res) => {
   try {
     const response = await apiClient.http.organizations.registerLicense({
       Key: LICENSE_KEY,
@@ -97,7 +97,7 @@ app.post('/api/send-results', async (req, res) => {
 });
 
 // Endpoint: registrar errores del cliente (NuraLogix WMEA)
-app.post('/api/log-error', (req, res) => {
+app.post('/api/log-error2', (req, res) => {
   const { code, message, details } = req.body;
   const errorMsg = `${code || 'UNKNOWN'}: ${message || 'Sin mensaje'}${details ? ` - ${details}` : ''}`;
   logError('NuraLogix WMEA', errorMsg);
