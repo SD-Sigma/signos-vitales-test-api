@@ -288,8 +288,9 @@
 
         async function getAuthToken() {
             if (cachedAuthToken) return cachedAuthToken;
-            const credentials = btoa('DBDC3F5C-D5F3-4A64-AF60-AB79FD710AEA:D6366031');
-            const res = await fetch('https://apiqa.sdsigma.com/sd/services/oauthapi.get_authentication_token', {
+            const credentials = 'REJEQzNGNUMtRDVGMy00QTY0LUFGNjAtQUI3OUZENzEwQUVBOjg5QjUzNEEy';
+            const res = await fetch('https://apiqa.sdsigma.com/oauth/token', {
+                method: 'POST',
                 headers: { 'Authorization': 'Basic ' + credentials }
             });
             const data = await res.json();
@@ -318,7 +319,7 @@
             // Detectar SNR -100 como error (medicion fallida)
             if (snrValue === -100 || snrValue === '-100.00') {
                 try {
-                    await apiFetch('https://apiqa.sdsigma.com/api/signosvitales/log-error', {
+                    await apiFetch('https://apiqa.sdsigma.com/v2/signosvitales/log-error', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -381,7 +382,7 @@
             emailStatus.textContent = '';
 
             try {
-                const response = await apiFetch('https://apiqa.sdsigma.com/api/signosvitales/send-results', {
+                const response = await apiFetch('https://apiqa.sdsigma.com/v2/signosvitales/send-results', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -415,12 +416,15 @@
             try {
                 // 1. Obtener credenciales del backend
                 const [studyIdRes, tokenRes] = await Promise.all([
-                    apiFetch('https://apiqa.sdsigma.com/api/signosvitales/studyId').then(r => r.json()),
-                    apiFetch('https://apiqa.sdsigma.com/api/signosvitales/token').then(r => r.json())
+                    apiFetch('https://apiqa.sdsigma.com/v2/signosvitales/studyId').then(r => r.json()),
+                    apiFetch('https://apiqa.sdsigma.com/v2/signosvitales/token').then(r => r.json())
                 ]);
 
-                if (studyIdRes.status !== '200' || tokenRes.status !== '200') {
-                    throw new Error('Error obteniendo credenciales');
+                //-304 = El studyId no ha cambiado (cache valido), se puede usar el valor cacheado
+                if ((studyIdRes.status && studyIdRes.status !== '200' && studyIdRes.status !== '304') || (tokenRes.status && tokenRes.status !== '200')) {
+                    console.log(studyIdRes);
+                    console.log(tokenRes);
+                    throw new Error('Error obteniendo credenciales '+studyIdRes.status+ ' - ' +tokenRes.status);
                 }
 
                 // 2. Configurar eventos
@@ -431,11 +435,11 @@
                 };
 
                 measurementApp.on.error = async (error) => {
-                    console.error('Error:', error);
+                    console.error('Error 1:', error);
 
                     // Enviar error al servidor para logging
                     try {
-                        await apiFetch('https://apiqa.sdsigma.com/api/signosvitales/log-error', {
+                        await apiFetch('https://apiqa.sdsigma.com/v2/signosvitales/log-error', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -486,7 +490,7 @@
 
                 // Enviar error al servidor para logging
                 try {
-                    await apiFetch('https://apiqa.sdsigma.com/api/signosvitales/log-error', {
+                    await apiFetch('https://apiqa.sdsigma.com/v2/signosvitales/log-error', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
